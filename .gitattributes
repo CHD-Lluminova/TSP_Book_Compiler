@@ -1,3 +1,0 @@
-public/videos/intro_new.mp4 filter=lfs diff=lfs merge=lfs -text
-public/videos/door-portal filter=lfs diff=lfs merge=lfs -text
-public/videos/door-portal.mp4 filter=lfs diff=lfs merge=lfs -text
