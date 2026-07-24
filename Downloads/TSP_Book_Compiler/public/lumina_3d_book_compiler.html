@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumina 3D Book Compiler & Studio</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- 3D Engine Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <!-- PDF Export Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; }
+        .font-fredoka { font-family: 'Fredoka', cursive; }
+        .canvas-container { cursor: grab; }
+        .canvas-container:active { cursor: grabbing; }
+        /* Custom scrollbar styling for sidebar panels */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.8); }
+        
+        textarea {
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 select-none overflow-hidden">
+
+    <!-- Navigation Header -->
+    <header class="h-16 px-6 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-book-open text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
+                    Lumina 3D Book Compiler <span class="px-2 py-0.5 text-[10px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-full font-semibold">Pro Studio</span>
+                </h1>
+                <p class="text-xs text-slate-400">Interactive 3D WebGL Book Builder & Auto-Flow Writer</p>
+            </div>
+        </div>
+
+        <!-- Central Studio Action Toolbar -->
+        <div class="flex items-center gap-3">
+            <button id="btnOpenBook" onclick="toggleBookState()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30 active:scale-95">
+                <i class="fa-solid fa-book-open"></i> <span id="openBtnText">Open 3D Book</span>
+            </button>
+            <button onclick="resetCamera()" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 transition-all" title="Reset 3D Viewport">
+                <i class="fa-solid fa-arrows-to-eye"></i>
+            </button>
+            <button onclick="toggleFullscreen()" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 transition-all" title="Toggle Fullscreen Studio">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Studio Workspace -->
+    <div class="flex-1 flex relative overflow-hidden">
+
+        <!-- Left Sidebar: Book Studio Workbench -->
+        <aside class="w-96 bg-slate-900/90 border-r border-slate-800/80 flex flex-col z-20 shrink-0 backdrop-blur-md">
+            
+            <!-- Navigation Tabs -->
+            <div class="flex border-b border-slate-800 text-xs font-bold bg-slate-950/40">
+                <button onclick="switchTab('pages')" id="tab-btn-pages" class="flex-1 py-3 border-b-2 border-indigo-500 text-indigo-400 flex items-center justify-center gap-2 transition-all">
+                    <i class="fa-solid fa-layer-group"></i> Pages (<span id="pageCountBadge">2</span>)
+                </button>
+                <button onclick="switchTab('cover')" id="tab-btn-cover" class="flex-1 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition-all">
+                    <i class="fa-solid fa-book-bookmark"></i> Cover Studio
+                </button>
+                <button onclick="switchTab('export')" id="tab-btn-export" class="flex-1 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition-all">
+                    <i class="fa-solid fa-file-export"></i> Export
+                </button>
+            </div>
+
+            <!-- Tab Panel 1: Page Manager -->
+            <div id="panel-pages" class="flex-1 p-4 overflow-y-auto space-y-4">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Page Spreads List</h2>
+                        <p class="text-[10px] text-indigo-400">Auto-reflow enabled across pages</p>
+                    </div>
+                    <button onclick="addNewSpread()" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-plus"></i> Add Spread (+2 Pages)
+                    </button>
+                </div>
+
+                <!-- Spreads Container -->
+                <div id="spreadsContainer" class="space-y-4">
+                    <!-- Dynamic spread items injected here -->
+                </div>
+            </div>
+
+            <!-- Tab Panel 2: Dust Jacket & Cover Studio -->
+            <div id="panel-cover" class="flex-1 p-4 overflow-y-auto space-y-5 hidden">
+                <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Book Cover Design</h2>
+                    <p class="text-xs text-slate-400">Upload individual images or full wrap cover art.</p>
+                </div>
+
+                <!-- Full Wrap Upload -->
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <label class="text-xs font-bold text-indigo-400 flex items-center justify-between">
+                        <span><i class="fa-solid fa-image"></i> Full Wrap Dust Jacket</span>
+                        <span class="text-[10px] text-slate-500">Auto-Splits Back/Spine/Front</span>
+                    </label>
+                    <input type="file" accept="image/*" onchange="handleWrapCoverUpload(event)" class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer w-full">
+                </div>
+
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-3 text-[10px] uppercase text-slate-500 font-bold">Or Upload Components</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <!-- Component Covers -->
+                <div class="space-y-3">
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <label class="text-xs font-semibold text-slate-300 block mb-1">Front Cover Image</label>
+                        <input type="file" accept="image/*" onchange="handleComponentCoverUpload(event, 'front')" class="text-xs text-slate-400 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 w-full">
+                    </div>
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <label class="text-xs font-semibold text-slate-300 block mb-1">Back Cover Image</label>
+                        <input type="file" accept="image/*" onchange="handleComponentCoverUpload(event, 'back')" class="text-xs text-slate-400 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 w-full">
+                    </div>
+                    <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <label class="text-xs font-semibold text-slate-300 block mb-1">Spine Artwork</label>
+                        <input type="file" accept="image/*" onchange="handleComponentCoverUpload(event, 'spine')" class="text-xs text-slate-400 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 w-full">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Panel 3: Export & Compile Center -->
+            <div id="panel-export" class="flex-1 p-4 overflow-y-auto space-y-4 hidden">
+                <div class="bg-indigo-950/30 border border-indigo-500/30 p-4 rounded-2xl">
+                    <h3 class="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-cube text-indigo-400"></i> Interactive 3D HTML Reader
+                    </h3>
+                    <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                        Compiles your entire book into a <strong>standalone 3D WebGL HTML application</strong> with full text wrapping and pagination preserved!
+                    </p>
+                    <button onclick="exportStandalone3DHTML()" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all">
+                        <i class="fa-solid fa-download"></i> Compile 3D Reader (.html)
+                    </button>
+                </div>
+
+                <div class="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-file-pdf text-red-400"></i> Alternative Flat Formats
+                    </h3>
+                    <button onclick="exportAsPDF()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i class="fa-solid fa-file-pdf"></i> Export Printable PDF Book
+                    </button>
+                    <button onclick="exportSpreadPNG()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i class="fa-solid fa-image"></i> Export Active Spread High-Res PNG
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Viewport: Interactive 3D Canvas -->
+        <main class="flex-1 relative bg-slate-950 overflow-hidden">
+            <div id="canvas-container" class="w-full h-full absolute inset-0 canvas-container"></div>
+
+            <!-- Floating Studio HUD Controls -->
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-xl px-4 pointer-events-auto">
+                
+                <!-- Spread Navigation Bar -->
+                <div class="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl flex items-center justify-between w-full gap-4">
+                    <button onclick="prevSpread()" class="px-4 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-700">
+                        <i class="fa-solid fa-chevron-left"></i> Prev
+                    </button>
+
+                    <div class="flex-1 text-center">
+                        <span id="currentSpreadText" class="text-xs font-extrabold text-white block">Pages 1 & 2</span>
+                        <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden mt-1 border border-slate-800">
+                            <div id="progressBar" class="h-full bg-indigo-500 transition-all duration-300" style="width: 50%;"></div>
+                        </div>
+                    </div>
+
+                    <button onclick="nextSpread()" class="px-4 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-700">
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <!-- Toggles Bar -->
+                <div class="flex items-center gap-2">
+                    <button id="btnAutoSpin" onclick="toggleAutoSpin()" class="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border border-slate-800 rounded-xl text-xs font-semibold flex items-center gap-2 text-indigo-400 transition-all shadow-lg">
+                        <i class="fa-solid fa-arrows-spin"></i> Spin: <span id="statusSpin">ON</span>
+                    </button>
+                    <button id="btnAutoFloat" onclick="toggleAutoFloat()" class="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border border-slate-800 rounded-xl text-xs font-semibold flex items-center gap-2 text-indigo-400 transition-all shadow-lg">
+                        <i class="fa-solid fa-up-down"></i> Float: <span id="statusFloat">ON</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Core State Store
+        let compiledPages = [
+            {
+                num: 1,
+                text: "George woke up, but his clock was spinning backwards! 'Oh no,' he muttered, 'it's going to be a messed-up Monday!'",
+                fullPage: false,
+                previewDataUrl: null
+            },
+            {
+                num: 2,
+                text: "The living room was full of bouncing, flying donuts. His dog Milo was wearing a superhero cape and barking at a floating blue teapot.",
+                fullPage: false,
+                previewDataUrl: null
+            }
+        ];
+
+        let customFullWrapImg = null;
+        let customFrontImg = null;
+        let customBackImg = null;
+        let customSpineImg = null;
+
+        let activeSpreadIndex = 0;
+        let isBookOpen = false;
+        let autoSpin = true;
+        let autoFloat = true;
+
+        // Three.js Engine Variables
+        let scene, camera, renderer, controls;
+        let closedBookMesh, openedBookGroup;
+        let leftPageMesh, rightPageMesh;
+        let leftCoverMesh, rightCoverMesh;
+        let closedMaterials = [];
+        let clock = new THREE.Clock();
+
+        // Offscreen Canvases for Texture Rendering
+        const frontCanvas = document.createElement('canvas');
+        const backCanvas = document.createElement('canvas');
+        const spineCanvas = document.createElement('canvas');
+        const leftPageCanvas = document.createElement('canvas');
+        const rightPageCanvas = document.createElement('canvas');
+
+        frontCanvas.width = 1024; frontCanvas.height = 1424;
+        backCanvas.width = 1024; backCanvas.height = 1424;
+        spineCanvas.width = 256; spineCanvas.height = 1424;
+        leftPageCanvas.width = 1024; leftPageCanvas.height = 1424;
+        rightPageCanvas.width = 1024; rightPageCanvas.height = 1424;
+
+        /**
+         * Advanced Line Wrapping & Character Splitting Engine.
+         * Handles both word boundaries AND uninterrupted character sequences (e.g., 'pppppppppppppppp').
+         * Returns fitted lines and any excess overflow text that exceeds maxHeight.
+         */
+        function getWrappedLines(context, text, maxWidth, maxHeight, lineHeight) {
+            let lines = [];
+            if (!text) return { lines: [], overflowText: "" };
+
+            let paragraphs = text.split('\n');
+            let maxLines = Math.floor(maxHeight / lineHeight);
+
+            for (let p = 0; p < paragraphs.length; p++) {
+                let para = paragraphs[p];
+                let words = para.split(' ');
+                let currentLine = '';
+
+                for (let w = 0; w < words.length; w++) {
+                    let word = words[w];
+                    let testLine = currentLine ? (currentLine + ' ' + word) : word;
+                    let metrics = context.measureText(testLine);
+
+                    if (metrics.width <= maxWidth) {
+                        currentLine = testLine;
+                    } else {
+                        if (currentLine) {
+                            lines.push(currentLine);
+                            if (lines.length >= maxLines) {
+                                let remainingInPara = words.slice(w).join(' ');
+                                let overflow = [remainingInPara, ...paragraphs.slice(p + 1)].join('\n');
+                                return { lines, overflowText: overflow };
+                            }
+                            currentLine = '';
+                        }
+
+                        // If a single word is wider than maxWidth (e.g. continuous 'ppppppppp')
+                        if (context.measureText(word).width > maxWidth) {
+                            for (let c = 0; c < word.length; c++) {
+                                let char = word[c];
+                                let testCharLine = currentLine + char;
+                                if (context.measureText(testCharLine).width <= maxWidth) {
+                                    currentLine = testCharLine;
+                                } else {
+                                    lines.push(currentLine);
+                                    if (lines.length >= maxLines) {
+                                        let remainingWord = word.slice(c);
+                                        let remainingInPara = (w + 1 < words.length) ? (' ' + words.slice(w + 1).join(' ')) : '';
+                                        let overflow = [remainingWord + remainingInPara, ...paragraphs.slice(p + 1)].join('\n');
+                                        return { lines, overflowText: overflow };
+                                    }
+                                    currentLine = char;
+                                }
+                            }
+                        } else {
+                            currentLine = word;
+                        }
+                    }
+                }
+
+                if (currentLine) {
+                    lines.push(currentLine);
+                    if (lines.length >= maxLines && (p < paragraphs.length - 1)) {
+                        let overflow = paragraphs.slice(p + 1).join('\n');
+                        return { lines, overflowText: overflow };
+                    }
+                    currentLine = '';
+                }
+            }
+
+            return { lines, overflowText: "" };
+        }
+
+        /**
+         * Real-time Book Digital Flow Reflow Engine.
+         * When text on a page exceeds height, it moves extra text onto the next page automatically!
+         */
+        function reflowBookText(startPageIdx = 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 1424;
+            const ctx = canvas.getContext('2d');
+            ctx.font = "bold 44px 'Fredoka'";
+
+            const maxWidth = 840;
+            const lineHeight = 60;
+
+            for (let i = startPageIdx; i < compiledPages.length; i++) {
+                let p = compiledPages[i];
+                if (p.fullPage) continue;
+
+                let availableHeight = p.loadedImg ? 300 : 1080;
+                let result = getWrappedLines(ctx, p.text || "", maxWidth, availableHeight, lineHeight);
+
+                if (result.overflowText && result.overflowText.trim().length > 0) {
+                    p.text = result.lines.join('\n');
+
+                    let nextIdx = i + 1;
+                    if (nextIdx >= compiledPages.length) {
+                        const nextNum = compiledPages.length + 1;
+                        compiledPages.push(
+                            { num: nextNum, text: "", fullPage: false, previewDataUrl: null },
+                            { num: nextNum + 1, text: "", fullPage: false, previewDataUrl: null }
+                        );
+                        recreateBookMesh();
+                    }
+
+                    let nextPage = compiledPages[nextIdx];
+                    if (nextPage.text && nextPage.text.trim().length > 0) {
+                        nextPage.text = result.overflowText + "\n" + nextPage.text;
+                    } else {
+                        nextPage.text = result.overflowText;
+                    }
+                }
+            }
+
+            updateTextareasInUI();
+            updateAllTextures();
+        }
+
+        function updateTextareasInUI() {
+            compiledPages.forEach((p, idx) => {
+                const ta = document.getElementById(`page-textarea-${idx}`);
+                if (ta && document.activeElement !== ta) {
+                    ta.value = p.text || '';
+                }
+            });
+            document.getElementById('pageCountBadge').innerText = compiledPages.length;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('[id^="tab-btn-"]').forEach(b => {
+                b.classList.remove('border-indigo-500', 'text-indigo-400');
+                b.classList.add('border-transparent', 'text-slate-400');
+            });
+
+            document.getElementById(`panel-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            activeBtn.classList.add('border-indigo-500', 'text-indigo-400');
+        }
+
+        function renderSpreadsUI() {
+            const container = document.getElementById('spreadsContainer');
+            container.innerHTML = '';
+            const totalSpreads = Math.ceil(compiledPages.length / 2);
+
+            for (let i = 0; i < totalSpreads; i++) {
+                const leftPage = compiledPages[i * 2];
+                const rightPage = compiledPages[i * 2 + 1];
+
+                const spreadCard = document.createElement('div');
+                spreadCard.className = `p-3.5 rounded-2xl border transition-all ${i === activeSpreadIndex ? 'bg-indigo-950/40 border-indigo-500/60 shadow-lg shadow-indigo-500/10' : 'bg-slate-950/60 border-slate-800'}`;
+                
+                spreadCard.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">Spread ${i + 1} (Pages ${leftPage.num} & ${rightPage.num})</span>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="selectSpread(${i})" class="px-2.5 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold">Preview Spread</button>
+                            ${totalSpreads > 1 ? `<button onclick="removeSpread(${i})" class="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg" title="Delete Spread"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Left Page Input -->
+                    <div class="space-y-2 p-2.5 bg-slate-900/80 rounded-xl border border-slate-800/80 mb-2">
+                        <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+                            <span>Left Page ${leftPage.num}</span>
+                            <label class="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                                <input type="checkbox" ${leftPage.fullPage ? 'checked' : ''} onchange="toggleFullPage(${leftPage.num - 1}, this.checked)" class="rounded accent-indigo-500"> Full Bleed
+                            </label>
+                        </div>
+                        <input type="file" accept="image/*" onchange="handlePageImageUpload(event, ${leftPage.num - 1})" class="text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-800 file:text-slate-300 w-full">
+                        <textarea id="page-textarea-${leftPage.num - 1}" placeholder="Story narrative text..." oninput="updatePageText(${leftPage.num - 1}, this.value)" class="w-full h-16 bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 resize-none break-words whitespace-pre-wrap">${leftPage.text || ''}</textarea>
+                    </div>
+
+                    <!-- Right Page Input -->
+                    <div class="space-y-2 p-2.5 bg-slate-900/80 rounded-xl border border-slate-800/80">
+                        <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+                            <span>Right Page ${rightPage.num}</span>
+                            <label class="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                                <input type="checkbox" ${rightPage.fullPage ? 'checked' : ''} onchange="toggleFullPage(${rightPage.num - 1}, this.checked)" class="rounded accent-indigo-500"> Full Bleed
+                            </label>
+                        </div>
+                        <input type="file" accept="image/*" onchange="handlePageImageUpload(event, ${rightPage.num - 1})" class="text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-800 file:text-slate-300 w-full">
+                        <textarea id="page-textarea-${rightPage.num - 1}" placeholder="Story narrative text..." oninput="updatePageText(${rightPage.num - 1}, this.value)" class="w-full h-16 bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 resize-none break-words whitespace-pre-wrap">${rightPage.text || ''}</textarea>
+                    </div>
+                `;
+
+                container.appendChild(spreadCard);
+            }
+
+            document.getElementById('pageCountBadge').innerText = compiledPages.length;
+        }
+
+        function addNewSpread() {
+            const nextNum = compiledPages.length + 1;
+            compiledPages.push(
+                { num: nextNum, text: "", fullPage: false, previewDataUrl: null },
+                { num: nextNum + 1, text: "", fullPage: false, previewDataUrl: null }
+            );
+            renderSpreadsUI();
+            recreateBookMesh();
+            updateAllTextures();
+        }
+
+        function removeSpread(index) {
+            compiledPages.splice(index * 2, 2);
+            compiledPages.forEach((p, i) => p.num = i + 1);
+            if (activeSpreadIndex >= Math.ceil(compiledPages.length / 2)) {
+                activeSpreadIndex = Math.max(0, Math.ceil(compiledPages.length / 2) - 1);
+            }
+            renderSpreadsUI();
+            recreateBookMesh();
+            updateAllTextures();
+        }
+
+        function selectSpread(index) {
+            activeSpreadIndex = index;
+            renderSpreadsUI();
+            updateAllTextures();
+        }
+
+        function updatePageText(pageIdx, text) {
+            compiledPages[pageIdx].text = text;
+            reflowBookText(pageIdx);
+        }
+
+        function toggleFullPage(pageIdx, isFull) {
+            compiledPages[pageIdx].fullPage = isFull;
+            reflowBookText(pageIdx);
+        }
+
+        function handlePageImageUpload(e, pageIdx) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    compiledPages[pageIdx].previewDataUrl = event.target.result;
+                    compiledPages[pageIdx].loadedImg = img;
+                    reflowBookText(pageIdx);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleWrapCoverUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    customFullWrapImg = img;
+                    updateAllTextures();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleComponentCoverUpload(e, type) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    if (type === 'front') customFrontImg = img;
+                    if (type === 'back') customBackImg = img;
+                    if (type === 'spine') customSpineImg = img;
+                    updateAllTextures();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function getBookThickness() {
+            return Math.min(2.5, 0.25 + (compiledPages.length * 0.08));
+        }
+
+        function createPageCurveGeometry(width, height, segX, segY, isLeft) {
+            const geo = new THREE.PlaneGeometry(width, height, segX, segY);
+            const pos = geo.attributes.position;
+            const curveIntensity = 0.15;
+            for (let i = 0; i < pos.count; i++) {
+                let x = pos.getX(i);
+                let normX = isLeft ? (x + width / 2) / width : (width / 2 - x) / width;
+                let z = Math.sin(normX * Math.PI * 0.5) * curveIntensity;
+                pos.setZ(i, z);
+            }
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0a0c10, 0.04);
+
+            camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 1.2, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 15;
+            controls.minDistance = 3;
+            controls.target.set(0, 0, 0);
+
+            controls.addEventListener('start', () => {
+                if (autoSpin) toggleAutoSpin();
+            });
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(5, 10, 6);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x6366f1, 2.5, 15);
+            pointLight.position.set(-3, 2, 4);
+            scene.add(pointLight);
+
+            // Ground Shadow
+            const shadowPlaneGeo = new THREE.PlaneGeometry(30, 30);
+            const shadowPlaneMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+            const shadowPlane = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -3.0;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            recreateBookMesh();
+
+            // Open Book Assembly
+            openedBookGroup = new THREE.Group();
+            openedBookGroup.visible = false;
+            scene.add(openedBookGroup);
+
+            const coverWidth = 3.75, coverHeight = 5.25, coverThickness = 0.08;
+            const coverGeo = new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness);
+
+            const coverLMaterials = Array(6).fill(null).map((_, idx) => 
+                new THREE.MeshStandardMaterial({ color: idx === 4 || idx === 5 ? 0xffffff : 0x1e1b4b, roughness: 0.3 })
+            );
+            const coverRMaterials = Array(6).fill(null).map((_, idx) => 
+                new THREE.MeshStandardMaterial({ color: idx === 4 || idx === 5 ? 0xffffff : 0x1e1b4b, roughness: 0.3 })
+            );
+
+            leftCoverMesh = new THREE.Mesh(coverGeo, coverLMaterials);
+            leftCoverMesh.position.set(-1.875, 0, -0.06);
+            leftCoverMesh.castShadow = true;
+            openedBookGroup.add(leftCoverMesh);
+
+            rightCoverMesh = new THREE.Mesh(coverGeo, coverRMaterials);
+            rightCoverMesh.position.set(1.875, 0, -0.06);
+            rightCoverMesh.castShadow = true;
+            openedBookGroup.add(rightCoverMesh);
+
+            const leftCurvedGeo = createPageCurveGeometry(3.6, 5.1, 15, 15, true);
+            const rightCurvedGeo = createPageCurveGeometry(3.6, 5.1, 15, 15, false);
+
+            const pageMatConfig = { roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide };
+            leftPageMesh = new THREE.Mesh(leftCurvedGeo, new THREE.MeshStandardMaterial(pageMatConfig));
+            leftPageMesh.position.set(-1.82, 0, 0);
+            leftPageMesh.castShadow = true;
+            openedBookGroup.add(leftPageMesh);
+
+            rightPageMesh = new THREE.Mesh(rightCurvedGeo, new THREE.MeshStandardMaterial(pageMatConfig));
+            rightPageMesh.position.set(1.82, 0, 0);
+            rightPageMesh.castShadow = true;
+            openedBookGroup.add(rightPageMesh);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function recreateBookMesh() {
+            if (closedBookMesh) scene.remove(closedBookMesh);
+
+            const currentThickness = getBookThickness();
+            const geometry = new THREE.BoxGeometry(3.6, 5.1, currentThickness);
+
+            closedMaterials = [
+                new THREE.MeshStandardMaterial({ name: 'pages_right' }),
+                new THREE.MeshStandardMaterial({ name: 'spine' }),
+                new THREE.MeshStandardMaterial({ name: 'pages_top' }),
+                new THREE.MeshStandardMaterial({ name: 'pages_bottom' }),
+                new THREE.MeshStandardMaterial({ name: 'front' }),
+                new THREE.MeshStandardMaterial({ name: 'back' })
+            ];
+
+            closedBookMesh = new THREE.Mesh(geometry, closedMaterials);
+            closedBookMesh.castShadow = true;
+            closedBookMesh.receiveShadow = true;
+            scene.add(closedBookMesh);
+
+            closedBookMesh.visible = !isBookOpen;
+        }
+
+        function drawCovers() {
+            const fCtx = frontCanvas.getContext('2d');
+            const bCtx = backCanvas.getContext('2d');
+            const sCtx = spineCanvas.getContext('2d');
+
+            fCtx.clearRect(0, 0, frontCanvas.width, frontCanvas.height);
+            bCtx.clearRect(0, 0, backCanvas.width, backCanvas.height);
+            sCtx.clearRect(0, 0, spineCanvas.width, spineCanvas.height);
+
+            const currentThickness = getBookThickness();
+
+            if (customFullWrapImg) {
+                const bWidth = 3.6, sWidth = currentThickness, fWidth = 3.6;
+                const totalUnits = bWidth + sWidth + fWidth;
+                const fBack = bWidth / totalUnits, fSpine = sWidth / totalUnits, fFront = fWidth / totalUnits;
+                const w = customFullWrapImg.width, h = customFullWrapImg.height;
+
+                bCtx.drawImage(customFullWrapImg, 0, 0, w * fBack, h, 0, 0, backCanvas.width, backCanvas.height);
+                sCtx.drawImage(customFullWrapImg, w * fBack, 0, w * fSpine, h, 0, 0, spineCanvas.width, spineCanvas.height);
+                fCtx.drawImage(customFullWrapImg, w * (fBack + fSpine), 0, w * fFront, h, 0, 0, frontCanvas.width, frontCanvas.height);
+            } else {
+                bCtx.fillStyle = "#4f46e5"; bCtx.fillRect(0, 0, backCanvas.width, backCanvas.height);
+                sCtx.fillStyle = "#4f46e5"; sCtx.fillRect(0, 0, spineCanvas.width, spineCanvas.height);
+                fCtx.fillStyle = "#4f46e5"; fCtx.fillRect(0, 0, frontCanvas.width, frontCanvas.height);
+
+                if (customFrontImg) fCtx.drawImage(customFrontImg, 0, 0, frontCanvas.width, frontCanvas.height);
+                else {
+                    fCtx.fillStyle = "#ffffff";
+                    fCtx.font = "bold 60px 'Fredoka'";
+                    fCtx.textAlign = "center";
+                    fCtx.fillText("PICTURE BOOK", frontCanvas.width/2, 500);
+                    fCtx.font = "40px 'Fredoka'";
+                    fCtx.fillStyle = "#10b981";
+                    fCtx.fillText("3D EDITION", frontCanvas.width/2, 600);
+                }
+
+                if (customBackImg) bCtx.drawImage(customBackImg, 0, 0, backCanvas.width, backCanvas.height);
+                if (customSpineImg) sCtx.drawImage(customSpineImg, 0, 0, spineCanvas.width, spineCanvas.height);
+            }
+        }
+
+        function drawPageOnCanvas(canvas, pageData, isLeft) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "#faf4ec";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let shading = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            if (isLeft) {
+                shading.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+                shading.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+            } else {
+                shading.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+                shading.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
+            }
+            ctx.fillStyle = shading;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (pageData.loadedImg) {
+                if (pageData.fullPage) {
+                    ctx.drawImage(pageData.loadedImg, 0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.save();
+                    ctx.fillStyle = "#ffffff";
+                    ctx.shadowColor = "rgba(0,0,0,0.06)";
+                    ctx.shadowBlur = 15;
+                    ctx.shadowOffsetY = 8;
+                    const cardWidth = 840, cardHeight = 780;
+                    const cardX = (canvas.width - cardWidth) / 2, cardY = 100;
+                    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+                    ctx.restore();
+
+                    const imgMargin = 40;
+                    const imgW = cardWidth - (imgMargin * 2);
+                    const imgH = cardHeight - (imgMargin * 2) - 40;
+                    ctx.drawImage(pageData.loadedImg, cardX + imgMargin, cardY + imgMargin, imgW, imgH);
+                }
+            } else if (!pageData.fullPage) {
+                ctx.save();
+                ctx.strokeStyle = "rgba(0,0,0,0.08)";
+                ctx.lineWidth = 4;
+                ctx.strokeRect(100, 100, canvas.width - 200, 750);
+                ctx.font = "50px 'Fredoka'";
+                ctx.fillStyle = "rgba(99,102,241,0.25)";
+                ctx.textAlign = "center";
+                ctx.fillText("Illustration Slot", canvas.width/2, 450);
+                ctx.restore();
+            }
+
+            if (!pageData.fullPage) {
+                ctx.fillStyle = "#1e293b";
+                ctx.font = "bold 44px 'Fredoka'";
+                ctx.textAlign = "center";
+
+                let startY = pageData.loadedImg ? 980 : 200;
+                let maxH = pageData.loadedImg ? 300 : 1080;
+
+                let wrapRes = getWrappedLines(ctx, pageData.text || "", 840, maxH, 60);
+                let linesToDraw = wrapRes.lines;
+
+                let currentY = startY;
+                for (let l = 0; l < linesToDraw.length; l++) {
+                    ctx.fillText(linesToDraw[l], canvas.width / 2, currentY);
+                    currentY += 60;
+                }
+
+                ctx.fillStyle = "rgba(0,0,0,0.3)";
+                ctx.font = "bold 30px 'Plus Jakarta Sans'";
+                ctx.fillText(pageData.num, canvas.width/2, 1340);
+            }
+        }
+
+        function generatePagesEdge() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 128; tempCanvas.height = 128;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.fillStyle = "#faf4ec"; ctx.fillRect(0,0,128,128);
+            ctx.strokeStyle = "rgba(100, 80, 50, 0.12)"; ctx.lineWidth = 1;
+            for(let i=0; i<128; i+=3) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(128, i); ctx.stroke(); }
+            return tempCanvas;
+        }
+
+        function updateAllTextures() {
+            drawCovers();
+
+            const frontTex = new THREE.CanvasTexture(frontCanvas);
+            const backTex = new THREE.CanvasTexture(backCanvas);
+            const spineTex = new THREE.CanvasTexture(spineCanvas);
+            const pagesEdgeTex = new THREE.CanvasTexture(generatePagesEdge());
+
+            closedMaterials[4].map = frontTex;
+            closedMaterials[5].map = backTex;
+            closedMaterials[1].map = spineTex;
+            closedMaterials[0].map = pagesEdgeTex;
+            closedMaterials[2].map = pagesEdgeTex;
+            closedMaterials[3].map = pagesEdgeTex;
+
+            closedMaterials.forEach(m => m.needsUpdate = true);
+
+            if (leftCoverMesh) { leftCoverMesh.material[5].map = backTex; leftCoverMesh.material[5].needsUpdate = true; }
+            if (rightCoverMesh) { rightCoverMesh.material[5].map = frontTex; rightCoverMesh.material[5].needsUpdate = true; }
+
+            const leftPageData = compiledPages[activeSpreadIndex * 2];
+            const rightPageData = compiledPages[activeSpreadIndex * 2 + 1];
+
+            drawPageOnCanvas(leftPageCanvas, leftPageData, true);
+            drawPageOnCanvas(rightPageCanvas, rightPageData, false);
+
+            leftPageMesh.material.map = new THREE.CanvasTexture(leftPageCanvas);
+            leftPageMesh.material.needsUpdate = true;
+
+            rightPageMesh.material.map = new THREE.CanvasTexture(rightPageCanvas);
+            rightPageMesh.material.needsUpdate = true;
+
+            updateHUDText();
+        }
+
+        function updateHUDText() {
+            const lPage = compiledPages[activeSpreadIndex * 2];
+            const rPage = compiledPages[activeSpreadIndex * 2 + 1];
+            const totalSpreads = Math.ceil(compiledPages.length / 2);
+            document.getElementById('currentSpreadText').innerText = `Pages ${lPage.num} & ${rPage.num}`;
+            document.getElementById('progressBar').style.width = `${((activeSpreadIndex + 1) / totalSpreads) * 100}%`;
+        }
+
+        function toggleBookState() {
+            isBookOpen = !isBookOpen;
+
+            if (isBookOpen) {
+                autoSpin = false;
+                document.getElementById('statusSpin').innerText = "OFF";
+                document.getElementById('btnAutoSpin').className = "px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border border-slate-800 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-400 transition-all shadow-lg";
+
+                closedBookMesh.visible = false;
+                openedBookGroup.visible = true;
+
+                new TWEEN.Tween(openedBookGroup.rotation)
+                    .to({ x: -0.2, y: 0, z: 0 }, 1000)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                new TWEEN.Tween(camera.position)
+                    .to({ x: 0, y: 0, z: 8.5 }, 1000)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                document.getElementById('openBtnText').innerText = "Close 3D Cover";
+                document.getElementById('btnOpenBook').className = "px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-pink-600/30 active:scale-95";
+            } else {
+                closedBookMesh.visible = true;
+                openedBookGroup.visible = false;
+
+                new TWEEN.Tween(closedBookMesh.rotation)
+                    .to({ x: 0, y: 0, z: 0 }, 800)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                resetCamera();
+
+                document.getElementById('openBtnText').innerText = "Open 3D Book";
+                document.getElementById('btnOpenBook').className = "px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30 active:scale-95";
+            }
+        }
+
+        function nextSpread() {
+            const maxSpreads = Math.ceil(compiledPages.length / 2);
+            if (activeSpreadIndex < maxSpreads - 1) {
+                activeSpreadIndex++;
+                if (isBookOpen) triggerPageTurnAnimation();
+                renderSpreadsUI();
+                updateAllTextures();
+            }
+        }
+
+        function prevSpread() {
+            if (activeSpreadIndex > 0) {
+                activeSpreadIndex--;
+                if (isBookOpen) triggerPageTurnAnimation();
+                renderSpreadsUI();
+                updateAllTextures();
+            }
+        }
+
+        function triggerPageTurnAnimation() {
+            new TWEEN.Tween(openedBookGroup.rotation)
+                .to({ x: -0.2, y: 0.1, z: 0 }, 150)
+                .yoyo(true)
+                .repeat(1)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
+
+        function toggleAutoSpin() {
+            autoSpin = !autoSpin;
+            document.getElementById('statusSpin').innerText = autoSpin ? "ON" : "OFF";
+            document.getElementById('btnAutoSpin').classList.toggle('text-indigo-400');
+            document.getElementById('btnAutoSpin').classList.toggle('text-slate-400');
+        }
+
+        function toggleAutoFloat() {
+            autoFloat = !autoFloat;
+            document.getElementById('statusFloat').innerText = autoFloat ? "ON" : "OFF";
+            document.getElementById('btnAutoFloat').classList.toggle('text-indigo-400');
+            document.getElementById('btnAutoFloat').classList.toggle('text-slate-400');
+            if(!autoFloat) {
+                if (closedBookMesh) closedBookMesh.position.y = 0;
+                if (openedBookGroup) openedBookGroup.position.y = 0;
+            }
+        }
+
+        function resetCamera() {
+            new TWEEN.Tween(camera.position)
+                .to({ x: 0, y: 1.2, z: 10 }, 1000)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+            controls.target.set(0, 0, 0);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(()=>{});
+            } else {
+                document.exitFullscreen().catch(()=>{});
+            }
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            const elapsed = clock.getElapsedTime();
+
+            if (closedBookMesh && closedBookMesh.visible) {
+                if (autoFloat) closedBookMesh.position.y = Math.sin(elapsed * 1.5) * 0.12;
+                if (autoSpin) closedBookMesh.rotation.y += 0.35 * 0.016;
+            }
+
+            if (openedBookGroup && openedBookGroup.visible) {
+                if (autoFloat) openedBookGroup.position.y = Math.sin(elapsed * 1.5) * 0.08;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function exportStandalone3DHTML() {
+            const serializedPages = compiledPages.map(p => ({
+                num: p.num,
+                text: p.text || "",
+                fullPage: !!p.fullPage,
+                previewDataUrl: p.previewDataUrl || null
+            }));
+
+            const customCovers = {
+                fullWrap: customFullWrapImg ? customFullWrapImg.src : null,
+                front: customFrontImg ? customFrontImg.src : null,
+                back: customBackImg ? customBackImg.src : null,
+                spine: customSpineImg ? customSpineImg.src : null
+            };
+
+            const standaloneTemplate = `<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Interactive Picture Book Reader</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; margin: 0; }
+        .canvas-container { cursor: grab; }
+        .canvas-container:active { cursor: grabbing; }
+    </style>
+</head>
+<body class="h-full flex flex-col select-none relative bg-slate-950">
+
+    <!-- Top Navigation HUD -->
+    <header class="absolute top-0 left-0 right-0 z-20 px-6 py-4 flex items-center justify-between bg-slate-950/75 backdrop-blur-md border-b border-slate-800/80">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-cube text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base leading-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">3D Picture Book Reader</h1>
+                <p class="text-xs text-indigo-400 font-semibold">Interactive 3D WebGL Edition</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button id="btnOpenBook" onclick="toggleBookState()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30 active:scale-95">
+                <i class="fa-solid fa-book-open"></i> <span id="openBtnText">Open 3D Book</span>
+            </button>
+            <button onclick="resetCamera()" class="p-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 transition-all" title="Reset Camera View">
+                <i class="fa-solid fa-arrows-to-eye"></i>
+            </button>
+            <button onclick="toggleFullscreen()" class="p-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 transition-all" title="Toggle Fullscreen">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- WebGL Canvas Container -->
+    <div id="canvas-container" class="w-full h-full absolute inset-0 canvas-container"></div>
+
+    <!-- Instructions HUD -->
+    <div class="absolute top-20 left-6 z-10 pointer-events-none">
+        <div class="bg-slate-950/80 backdrop-blur-md px-4 py-3 rounded-xl border border-slate-800/80 shadow-2xl max-w-xs">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block mb-0.5">3D Viewport</span>
+            <h3 class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-3d text-indigo-400 animate-spin"></i> Click & Drag to Rotate in 3D
+            </h3>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Floating HUD -->
+    <footer class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-2xl px-4 pointer-events-auto">
+        <div class="bg-slate-950/85 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl flex items-center justify-between w-full gap-4">
+            
+            <button onclick="prevSpread()" class="px-4 py-2 bg-slate-900 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-800">
+                <i class="fa-solid fa-chevron-left"></i> Prev
+            </button>
+
+            <div class="flex-1 text-center">
+                <span id="currentSpreadText" class="text-xs font-extrabold text-white block">Pages 1 & 2</span>
+                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden mt-1 border border-slate-800">
+                    <div id="progressBar" class="h-full bg-indigo-500 transition-all duration-300" style="width: 50%;"></div>
+                </div>
+            </div>
+
+            <button onclick="nextSpread()" class="px-4 py-2 bg-slate-900 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-800">
+                Next <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="btnAutoSpin" onclick="toggleAutoSpin()" class="px-3 py-1.5 bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-800 rounded-lg text-xs font-semibold flex items-center gap-2 text-indigo-400 transition-all shadow-lg">
+                <i class="fa-solid fa-arrows-spin"></i> Spin: <span id="statusSpin">ON</span>
+            </button>
+            <button id="btnAutoFloat" onclick="toggleAutoFloat()" class="px-3 py-1.5 bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-800 rounded-lg text-xs font-semibold flex items-center gap-2 text-indigo-400 transition-all shadow-lg">
+                <i class="fa-solid fa-up-down"></i> Float: <span id="statusFloat">ON</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- 3D Engine Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"><\/script>
+
+    <script>
+        const pages = ${JSON.stringify(serializedPages)};
+        const customCovers = ${JSON.stringify(customCovers)};
+
+        let activeSpreadIndex = 0;
+        let isBookOpen = false;
+        let autoSpin = true;
+        let autoFloat = true;
+
+        let scene, camera, renderer, controls;
+        let closedBookMesh, openedBookGroup;
+        let leftPageMesh, rightPageMesh;
+        let leftCoverMesh, rightCoverMesh;
+        let closedMaterials = [];
+        let clock = new THREE.Clock();
+
+        let loadedImages = {
+            pages: {},
+            fullWrap: null,
+            front: null,
+            back: null,
+            spine: null
+        };
+
+        const frontCanvas = document.createElement('canvas');
+        const backCanvas = document.createElement('canvas');
+        const spineCanvas = document.createElement('canvas');
+        const leftPageCanvas = document.createElement('canvas');
+        const rightPageCanvas = document.createElement('canvas');
+
+        frontCanvas.width = 1024; frontCanvas.height = 1424;
+        backCanvas.width = 1024; backCanvas.height = 1424;
+        spineCanvas.width = 256; spineCanvas.height = 1424;
+        leftPageCanvas.width = 1024; leftPageCanvas.height = 1424;
+        rightPageCanvas.width = 1024; rightPageCanvas.height = 1424;
+
+        const container = document.getElementById('canvas-container');
+
+        function getWrappedLines(context, text, maxWidth, maxHeight, lineHeight) {
+            let lines = [];
+            if (!text) return { lines: [], overflowText: "" };
+
+            let paragraphs = text.split('\\n');
+            let maxLines = Math.floor(maxHeight / lineHeight);
+
+            for (let p = 0; p < paragraphs.length; p++) {
+                let para = paragraphs[p];
+                let words = para.split(' ');
+                let currentLine = '';
+
+                for (let w = 0; w < words.length; w++) {
+                    let word = words[w];
+                    let testLine = currentLine ? (currentLine + ' ' + word) : word;
+                    let metrics = context.measureText(testLine);
+
+                    if (metrics.width <= maxWidth) {
+                        currentLine = testLine;
+                    } else {
+                        if (currentLine) {
+                            lines.push(currentLine);
+                            if (lines.length >= maxLines) {
+                                let remainingInPara = words.slice(w).join(' ');
+                                let overflow = [remainingInPara, ...paragraphs.slice(p + 1)].join('\\n');
+                                return { lines, overflowText: overflow };
+                            }
+                            currentLine = '';
+                        }
+
+                        if (context.measureText(word).width > maxWidth) {
+                            for (let c = 0; c < word.length; c++) {
+                                let char = word[c];
+                                let testCharLine = currentLine + char;
+                                if (context.measureText(testCharLine).width <= maxWidth) {
+                                    currentLine = testCharLine;
+                                } else {
+                                    lines.push(currentLine);
+                                    if (lines.length >= maxLines) {
+                                        let remainingWord = word.slice(c);
+                                        let remainingInPara = (w + 1 < words.length) ? (' ' + words.slice(w + 1).join(' ')) : '';
+                                        let overflow = [remainingWord + remainingInPara, ...paragraphs.slice(p + 1)].join('\\n');
+                                        return { lines, overflowText: overflow };
+                                    }
+                                    currentLine = char;
+                                }
+                            }
+                        } else {
+                            currentLine = word;
+                        }
+                    }
+                }
+
+                if (currentLine) {
+                    lines.push(currentLine);
+                    if (lines.length >= maxLines && (p < paragraphs.length - 1)) {
+                        let overflow = paragraphs.slice(p + 1).join('\\n');
+                        return { lines, overflowText: overflow };
+                    }
+                    currentLine = '';
+                }
+            }
+
+            return { lines, overflowText: "" };
+        }
+
+        function getBookThickness() {
+            return Math.min(2.5, 0.25 + (pages.length * 0.08));
+        }
+
+        function createPageCurveGeometry(width, height, segX, segY, isLeft) {
+            const geo = new THREE.PlaneGeometry(width, height, segX, segY);
+            const pos = geo.attributes.position;
+            const curveIntensity = 0.15;
+            for (let i = 0; i < pos.count; i++) {
+                let x = pos.getX(i);
+                let normX = isLeft ? (x + width / 2) / width : (width / 2 - x) / width;
+                let z = Math.sin(normX * Math.PI * 0.5) * curveIntensity;
+                pos.setZ(i, z);
+            }
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0a0c10, 0.04);
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.2, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 15;
+            controls.minDistance = 3;
+            controls.target.set(0, 0, 0);
+
+            controls.addEventListener('start', () => {
+                if (autoSpin) toggleAutoSpin();
+            });
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(5, 10, 6);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x6366f1, 2.5, 15);
+            pointLight.position.set(-3, 2, 4);
+            scene.add(pointLight);
+
+            const shadowPlaneGeo = new THREE.PlaneGeometry(30, 30);
+            const shadowPlaneMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+            const shadowPlane = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -3.0;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            recreateBookMesh();
+
+            openedBookGroup = new THREE.Group();
+            openedBookGroup.visible = false;
+            scene.add(openedBookGroup);
+
+            const coverWidth = 3.75, coverHeight = 5.25, coverThickness = 0.08;
+            const coverGeo = new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness);
+
+            const coverLMaterials = Array(6).fill(null).map((_, idx) => 
+                new THREE.MeshStandardMaterial({ color: idx === 4 || idx === 5 ? 0xffffff : 0x1e1b4b, roughness: 0.3 })
+            );
+            const coverRMaterials = Array(6).fill(null).map((_, idx) => 
+                new THREE.MeshStandardMaterial({ color: idx === 4 || idx === 5 ? 0xffffff : 0x1e1b4b, roughness: 0.3 })
+            );
+
+            leftCoverMesh = new THREE.Mesh(coverGeo, coverLMaterials);
+            leftCoverMesh.position.set(-1.875, 0, -0.06);
+            leftCoverMesh.castShadow = true;
+            openedBookGroup.add(leftCoverMesh);
+
+            rightCoverMesh = new THREE.Mesh(coverGeo, coverRMaterials);
+            rightCoverMesh.position.set(1.875, 0, -0.06);
+            rightCoverMesh.castShadow = true;
+            openedBookGroup.add(rightCoverMesh);
+
+            const leftCurvedGeo = createPageCurveGeometry(3.6, 5.1, 15, 15, true);
+            const rightCurvedGeo = createPageCurveGeometry(3.6, 5.1, 15, 15, false);
+
+            const pageMatConfig = { roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide };
+            leftPageMesh = new THREE.Mesh(leftCurvedGeo, new THREE.MeshStandardMaterial(pageMatConfig));
+            leftPageMesh.position.set(-1.82, 0, 0);
+            leftPageMesh.castShadow = true;
+            openedBookGroup.add(leftPageMesh);
+
+            rightPageMesh = new THREE.Mesh(rightCurvedGeo, new THREE.MeshStandardMaterial(pageMatConfig));
+            rightPageMesh.position.set(1.82, 0, 0);
+            rightPageMesh.castShadow = true;
+            openedBookGroup.add(rightPageMesh);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function recreateBookMesh() {
+            if (closedBookMesh) scene.remove(closedBookMesh);
+
+            const currentThickness = getBookThickness();
+            const geometry = new THREE.BoxGeometry(3.6, 5.1, currentThickness);
+
+            closedMaterials = [
+                new THREE.MeshStandardMaterial({ name: 'pages_right' }),
+                new THREE.MeshStandardMaterial({ name: 'spine' }),
+                new THREE.MeshStandardMaterial({ name: 'pages_top' }),
+                new THREE.MeshStandardMaterial({ name: 'pages_bottom' }),
+                new THREE.MeshStandardMaterial({ name: 'front' }),
+                new THREE.MeshStandardMaterial({ name: 'back' })
+            ];
+
+            closedBookMesh = new THREE.Mesh(geometry, closedMaterials);
+            closedBookMesh.castShadow = true;
+            closedBookMesh.receiveShadow = true;
+            scene.add(closedBookMesh);
+
+            closedBookMesh.visible = !isBookOpen;
+        }
+
+        function drawCovers() {
+            const fCtx = frontCanvas.getContext('2d');
+            const bCtx = backCanvas.getContext('2d');
+            const sCtx = spineCanvas.getContext('2d');
+
+            fCtx.clearRect(0,0, frontCanvas.width, frontCanvas.height);
+            bCtx.clearRect(0,0, backCanvas.width, backCanvas.height);
+            sCtx.clearRect(0,0, spineCanvas.width, spineCanvas.height);
+
+            const currentThickness = getBookThickness();
+
+            if (loadedImages.fullWrap) {
+                const bWidth = 3.6, sWidth = currentThickness, fWidth = 3.6;
+                const totalUnits = bWidth + sWidth + fWidth;
+                const fBack = bWidth / totalUnits, fSpine = sWidth / totalUnits, fFront = fWidth / totalUnits;
+                const w = loadedImages.fullWrap.width, h = loadedImages.fullWrap.height;
+
+                bCtx.drawImage(loadedImages.fullWrap, 0, 0, w * fBack, h, 0, 0, backCanvas.width, backCanvas.height);
+                sCtx.drawImage(loadedImages.fullWrap, w * fBack, 0, w * fSpine, h, 0, 0, spineCanvas.width, spineCanvas.height);
+                fCtx.drawImage(loadedImages.fullWrap, w * (fBack + fSpine), 0, w * fFront, h, 0, 0, frontCanvas.width, frontCanvas.height);
+            } else {
+                bCtx.fillStyle = "#4f46e5"; bCtx.fillRect(0, 0, backCanvas.width, backCanvas.height);
+                sCtx.fillStyle = "#4f46e5"; sCtx.fillRect(0, 0, spineCanvas.width, spineCanvas.height);
+                fCtx.fillStyle = "#4f46e5"; fCtx.fillRect(0, 0, frontCanvas.width, frontCanvas.height);
+
+                if (loadedImages.front) fCtx.drawImage(loadedImages.front, 0, 0, frontCanvas.width, frontCanvas.height);
+                else {
+                    fCtx.fillStyle = "#ffffff";
+                    fCtx.font = "bold 60px 'Fredoka'";
+                    fCtx.textAlign = "center";
+                    fCtx.fillText("PICTURE BOOK", frontCanvas.width/2, 500);
+                    fCtx.font = "40px 'Fredoka'";
+                    fCtx.fillStyle = "#10b981";
+                    fCtx.fillText("3D EDITION", frontCanvas.width/2, 600);
+                }
+
+                if (loadedImages.back) bCtx.drawImage(loadedImages.back, 0, 0, backCanvas.width, backCanvas.height);
+                if (loadedImages.spine) sCtx.drawImage(loadedImages.spine, 0, 0, spineCanvas.width, spineCanvas.height);
+            }
+        }
+
+        function drawPageOnCanvas(canvas, pageData, isLeft) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "#faf4ec";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let shading = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            if (isLeft) {
+                shading.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+                shading.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+            } else {
+                shading.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+                shading.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
+            }
+            ctx.fillStyle = shading;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const img = loadedImages.pages[pageData.num];
+
+            if (img) {
+                if (pageData.fullPage) {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.save();
+                    ctx.fillStyle = "#ffffff";
+                    ctx.shadowColor = "rgba(0,0,0,0.06)";
+                    ctx.shadowBlur = 15;
+                    ctx.shadowOffsetY = 8;
+                    const cardWidth = 840, cardHeight = 780;
+                    const cardX = (canvas.width - cardWidth) / 2, cardY = 100;
+                    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+                    ctx.restore();
+
+                    const imgMargin = 40;
+                    const imgW = cardWidth - (imgMargin * 2);
+                    const imgH = cardHeight - (imgMargin * 2) - 40;
+                    ctx.drawImage(img, cardX + imgMargin, cardY + imgMargin, imgW, imgH);
+                }
+            } else if (!pageData.fullPage) {
+                ctx.save();
+                ctx.strokeStyle = "rgba(0,0,0,0.08)";
+                ctx.lineWidth = 4;
+                ctx.strokeRect(100, 100, canvas.width - 200, 750);
+                ctx.font = "50px 'Fredoka'";
+                ctx.fillStyle = "rgba(99,102,241,0.25)";
+                ctx.textAlign = "center";
+                ctx.fillText("Illustration Slot", canvas.width/2, 450);
+                ctx.restore();
+            }
+
+            if (!pageData.fullPage) {
+                ctx.fillStyle = "#1e293b";
+                ctx.font = "bold 44px 'Fredoka'";
+                ctx.textAlign = "center";
+
+                let startY = img ? 980 : 200;
+                let maxH = img ? 300 : 1080;
+
+                let wrapRes = getWrappedLines(ctx, pageData.text || "", 840, maxH, 60);
+                let linesToDraw = wrapRes.lines;
+
+                let currentY = startY;
+                for (let l = 0; l < linesToDraw.length; l++) {
+                    ctx.fillText(linesToDraw[l], canvas.width / 2, currentY);
+                    currentY += 60;
+                }
+
+                ctx.fillStyle = "rgba(0,0,0,0.3)";
+                ctx.font = "bold 30px 'Plus Jakarta Sans'";
+                ctx.fillText(pageData.num, canvas.width/2, 1340);
+            }
+        }
+
+        function generatePagesEdge() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 128; tempCanvas.height = 128;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.fillStyle = "#faf4ec"; ctx.fillRect(0,0,128,128);
+            ctx.strokeStyle = "rgba(100, 80, 50, 0.12)"; ctx.lineWidth = 1;
+            for(let i=0; i<128; i+=3) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(128, i); ctx.stroke(); }
+            return tempCanvas;
+        }
+
+        function updateAllTextures() {
+            drawCovers();
+
+            const frontTex = new THREE.CanvasTexture(frontCanvas);
+            const backTex = new THREE.CanvasTexture(backCanvas);
+            const spineTex = new THREE.CanvasTexture(spineCanvas);
+            const pagesEdgeTex = new THREE.CanvasTexture(generatePagesEdge());
+
+            closedMaterials[4].map = frontTex;
+            closedMaterials[5].map = backTex;
+            closedMaterials[1].map = spineTex;
+            closedMaterials[0].map = pagesEdgeTex;
+            closedMaterials[2].map = pagesEdgeTex;
+            closedMaterials[3].map = pagesEdgeTex;
+
+            closedMaterials.forEach(m => m.needsUpdate = true);
+
+            if (leftCoverMesh) { leftCoverMesh.material[5].map = backTex; leftCoverMesh.material[5].needsUpdate = true; }
+            if (rightCoverMesh) { rightCoverMesh.material[5].map = frontTex; rightCoverMesh.material[5].needsUpdate = true; }
+
+            const leftPageData = pages[activeSpreadIndex * 2];
+            const rightPageData = pages[(activeSpreadIndex * 2) + 1];
+
+            drawPageOnCanvas(leftPageCanvas, leftPageData, true);
+            drawPageOnCanvas(rightPageCanvas, rightPageData, false);
+
+            leftPageMesh.material.map = new THREE.CanvasTexture(leftPageCanvas);
+            leftPageMesh.material.needsUpdate = true;
+
+            rightPageMesh.material.map = new THREE.CanvasTexture(rightPageCanvas);
+            rightPageMesh.material.needsUpdate = true;
+
+            updateHUDText();
+        }
+
+        function updateHUDText() {
+            const lPage = pages[activeSpreadIndex * 2];
+            const rPage = pages[activeSpreadIndex * 2 + 1];
+            const totalSpreads = Math.ceil(pages.length / 2);
+            document.getElementById('currentSpreadText').innerText = \`Pages \${lPage.num} & \${rPage.num}\`;
+            document.getElementById('progressBar').style.width = \`\${((activeSpreadIndex + 1) / totalSpreads) * 100}%\`;
+        }
+
+        function toggleBookState() {
+            isBookOpen = !isBookOpen;
+
+            if (isBookOpen) {
+                autoSpin = false;
+                document.getElementById('statusSpin').innerText = "OFF";
+                document.getElementById('btnAutoSpin').className = "px-3 py-1.5 bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-800 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-400 transition-all shadow-lg";
+
+                closedBookMesh.visible = false;
+                openedBookGroup.visible = true;
+
+                new TWEEN.Tween(openedBookGroup.rotation)
+                    .to({ x: -0.2, y: 0, z: 0 }, 1000)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                new TWEEN.Tween(camera.position)
+                    .to({ x: 0, y: 0, z: 8.5 }, 1000)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                document.getElementById('openBtnText').innerText = "Close 3D Cover";
+                document.getElementById('btnOpenBook').className = "px-5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-pink-600/30 active:scale-95";
+            } else {
+                closedBookMesh.visible = true;
+                openedBookGroup.visible = false;
+
+                new TWEEN.Tween(closedBookMesh.rotation)
+                    .to({ x: 0, y: 0, z: 0 }, 800)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+
+                resetCamera();
+
+                document.getElementById('openBtnText').innerText = "Open 3D Book";
+                document.getElementById('btnOpenBook').className = "px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30 active:scale-95";
+            }
+        }
+
+        function nextSpread() {
+            const maxSpreads = Math.ceil(pages.length / 2);
+            if (activeSpreadIndex < maxSpreads - 1) {
+                activeSpreadIndex++;
+                if (isBookOpen) triggerPageTurnAnimation();
+                updateAllTextures();
+            }
+        }
+
+        function prevSpread() {
+            if (activeSpreadIndex > 0) {
+                activeSpreadIndex--;
+                if (isBookOpen) triggerPageTurnAnimation();
+                updateAllTextures();
+            }
+        }
+
+        function triggerPageTurnAnimation() {
+            new TWEEN.Tween(openedBookGroup.rotation)
+                .to({ x: -0.2, y: 0.1, z: 0 }, 150)
+                .yoyo(true)
+                .repeat(1)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
+
+        function toggleAutoSpin() {
+            autoSpin = !autoSpin;
+            document.getElementById('statusSpin').innerText = autoSpin ? "ON" : "OFF";
+            document.getElementById('btnAutoSpin').classList.toggle('text-indigo-400');
+            document.getElementById('btnAutoSpin').classList.toggle('text-slate-400');
+        }
+
+        function toggleAutoFloat() {
+            autoFloat = !autoFloat;
+            document.getElementById('statusFloat').innerText = autoFloat ? "ON" : "OFF";
+            document.getElementById('btnAutoFloat').classList.toggle('text-indigo-400');
+            document.getElementById('btnAutoFloat').classList.toggle('text-slate-400');
+            if(!autoFloat) {
+                if (closedBookMesh) closedBookMesh.position.y = 0;
+                if (openedBookGroup) openedBookGroup.position.y = 0;
+            }
+        }
+
+        function resetCamera() {
+            new TWEEN.Tween(camera.position)
+                .to({ x: 0, y: 1.2, z: 10 }, 1000)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+            controls.target.set(0, 0, 0);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(()=>{});
+            } else {
+                document.exitFullscreen().catch(()=>{});
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            const elapsed = clock.getElapsedTime();
+
+            if (closedBookMesh && closedBookMesh.visible) {
+                if (autoFloat) closedBookMesh.position.y = Math.sin(elapsed * 1.5) * 0.12;
+                if (autoSpin) closedBookMesh.rotation.y += 0.35 * 0.016;
+            }
+
+            if (openedBookGroup && openedBookGroup.visible) {
+                if (autoFloat) openedBookGroup.position.y = Math.sin(elapsed * 1.5) * 0.08;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function preloadAssetsAndStart() {
+            let pending = 0;
+
+            function checkDone() {
+                if (pending === 0) {
+                    initThree();
+                    updateAllTextures();
+                    animate();
+                }
+            }
+
+            if (customCovers.fullWrap) {
+                pending++;
+                const img = new Image();
+                img.onload = () => { loadedImages.fullWrap = img; pending--; checkDone(); };
+                img.onerror = () => { pending--; checkDone(); };
+                img.src = customCovers.fullWrap;
+            }
+            if (customCovers.front) {
+                pending++;
+                const img = new Image();
+                img.onload = () => { loadedImages.front = img; pending--; checkDone(); };
+                img.onerror = () => { pending--; checkDone(); };
+                img.src = customCovers.front;
+            }
+            if (customCovers.back) {
+                pending++;
+                const img = new Image();
+                img.onload = () => { loadedImages.back = img; pending--; checkDone(); };
+                img.onerror = () => { pending--; checkDone(); };
+                img.src = customCovers.back;
+            }
+            if (customCovers.spine) {
+                pending++;
+                const img = new Image();
+                img.onload = () => { loadedImages.spine = img; pending--; checkDone(); };
+                img.onerror = () => { pending--; checkDone(); };
+                img.src = customCovers.spine;
+            }
+
+            pages.forEach(p => {
+                if (p.previewDataUrl) {
+                    pending++;
+                    const img = new Image();
+                    img.onload = () => { loadedImages.pages[p.num] = img; pending--; checkDone(); };
+                    img.onerror = () => { pending--; checkDone(); };
+                    img.src = p.previewDataUrl;
+                }
+            });
+
+            checkDone();
+        }
+
+        window.onload = preloadAssetsAndStart;
+    <\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([standaloneTemplate], { type: "text/html;charset=utf-8" });
+            const link = document.createElement('a');
+            link.download = `3D_Interactive_Picture_Book.html`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+
+        async function exportAsPDF() {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [2048, 1424] });
+
+            const renderCanvas = document.createElement('canvas');
+            renderCanvas.width = 2048; renderCanvas.height = 1424;
+            const rCtx = renderCanvas.getContext('2d');
+
+            const totalSpreads = Math.ceil(compiledPages.length / 2);
+
+            for (let i = 0; i < totalSpreads; i++) {
+                if (i > 0) pdf.addPage([2048, 1424], 'landscape');
+
+                const lPageData = compiledPages[i * 2];
+                const rPageData = compiledPages[i * 2 + 1];
+
+                drawPageOnCanvas(leftPageCanvas, lPageData, true);
+                drawPageOnCanvas(rightPageCanvas, rPageData, false);
+
+                rCtx.clearRect(0, 0, 2048, 1424);
+                rCtx.drawImage(leftPageCanvas, 0, 0);
+                rCtx.drawImage(rightPageCanvas, 1024, 0);
+
+                const imgData = renderCanvas.toDataURL('image/jpeg', 0.92);
+                pdf.addImage(imgData, 'JPEG', 0, 0, 2048, 1424);
+            }
+
+            pdf.save("my_compiled_picture_book.pdf");
+        }
+
+        function exportSpreadPNG() {
+            const renderCanvas = document.createElement('canvas');
+            renderCanvas.width = 2048; renderCanvas.height = 1424;
+            const rCtx = renderCanvas.getContext('2d');
+
+            rCtx.drawImage(leftPageCanvas, 0, 0);
+            rCtx.drawImage(rightPageCanvas, 1024, 0);
+
+            const link = document.createElement('a');
+            link.download = `spread_${activeSpreadIndex + 1}_highres.png`;
+            link.href = renderCanvas.toDataURL('image/png');
+            link.click();
+        }
+
+        window.onload = function() {
+            renderSpreadsUI();
+            initThree();
+            reflowBookText(0);
+            animate();
+        };
+    </script>
+</body>
+</html>
