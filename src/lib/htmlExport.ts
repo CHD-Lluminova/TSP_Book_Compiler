@@ -385,3 +385,89 @@ export function downloadHTML(html: string, filename: string) {
   link.click();
   URL.revokeObjectURL(link.href);
 }
+
+export function buildPublisherHTML(
+  pages: BookPage[],
+  covers: Covers,
+  bookTitle: string,
+  authorName: string
+): string {
+  const safeTitle = escapeForTemplate(bookTitle);
+  const safeAuthor = escapeForTemplate(authorName);
+
+  let coverHtml = '';
+  if (covers.fullWrap) {
+    coverHtml += `<div class="cover-page" style="text-align: center; page-break-after: always;">
+      <h1>${safeTitle}</h1>
+      <h2>By ${safeAuthor}</h2>
+      <img src="${covers.fullWrap}" alt="Full Wrap Cover" style="max-width: 100%; height: auto;"/>
+    </div>`;
+  } else {
+    if (covers.front) {
+      coverHtml += `<div class="cover-page" style="text-align: center; page-break-after: always;">
+        <h1>${safeTitle}</h1>
+        <h2>By ${safeAuthor}</h2>
+        <img src="${covers.front}" alt="Front Cover" style="max-width: 100%; height: auto;"/>
+      </div>`;
+    }
+    if (covers.spine) {
+      coverHtml += `<div class="cover-page" style="text-align: center; page-break-after: always;">
+        <h3>Spine</h3>
+        <img src="${covers.spine}" alt="Spine Cover" style="max-height: 800px; width: auto;"/>
+      </div>`;
+    }
+    if (covers.back) {
+      coverHtml += `<div class="cover-page" style="text-align: center; page-break-after: always;">
+        <h3>Back Cover</h3>
+        <img src="${covers.back}" alt="Back Cover" style="max-width: 100%; height: auto;"/>
+      </div>`;
+    }
+  }
+
+  const pagesHtml = pages.map((page) => {
+    let pageContent = '';
+    if (page.imageDataUrl) {
+      pageContent += `<div class="page-image" style="text-align: center; margin-bottom: 20px;">
+        <img src="${page.imageDataUrl}" alt="Page ${page.num} Image" style="max-width: 100%; height: auto;"/>
+      </div>`;
+    }
+    if (page.text) {
+      pageContent += `<div class="page-text" style="font-family: serif; font-size: 1.2em; line-height: 1.6; text-align: justify;">
+        ${page.text.split('\n').map(p => `<p>${p}</p>`).join('')}
+      </div>`;
+    }
+    return `<div class="book-page" style="page-break-after: always; padding: 50px; min-height: 800px;">
+      <h4 style="text-align: right; font-family: sans-serif; font-size: 0.8em; color: #666;">Page ${page.num}</h4>
+      ${pageContent}
+    </div>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${safeTitle} — Publisher Edition</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 800px; margin: 20px auto; background: #fff; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { font-family: sans-serif; color: #222; }
+        .cover-page, .book-page { padding: 50px; }
+        .cover-page h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .cover-page h2 { font-size: 1.5em; color: #555; }
+        .page-text p { margin-bottom: 1em; }
+        @media print {
+            .cover-page, .book-page { page-break-after: always; }
+            body { margin: 0; }
+            .container { box-shadow: none; margin: 0; width: auto; max-width: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        ${coverHtml}
+        ${pagesHtml}
+    </div>
+</body>
+</html>`;
+}

@@ -22,7 +22,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { fetchFullBook, saveBookMeta, saveCovers, bulkSaveBook } from '@/lib/db';
 import { Book3DEngine } from '@/lib/bookEngine';
-import { buildStandalone3DHTML, downloadHTML } from '@/lib/htmlExport';
+import { buildStandalone3DHTML, downloadHTML, buildPublisherHTML } from '@/lib/htmlExport';
 import { reflowPages } from '@/lib/textWrap';
 import { fileToCompressedDataUrl } from '@/lib/imageUtils';
 import type { BookPage, Covers, FullBook } from '@/types';
@@ -190,6 +190,22 @@ export default function Studio({ bookId, onBack }: StudioProps) {
     }
   }, [book, pages, covers]);
 
+  const [downloadingPublisher, setDownloadingPublisher] = useState(false);
+  const handleDownloadForPublishers = useCallback(async () => {
+    if (!book) return;
+    setDownloadingPublisher(true);
+    try {
+      // This will generate a different HTML structure suitable for printing/publishers
+      const printableHtml = buildPublisherHTML(pages, covers, book.title, book.author_name);
+      const safeName = book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'book';
+      downloadHTML(printableHtml, `${safeName}_publisher_book.html`);
+    } catch (err: any) {
+      setError(err.message || 'Publisher export failed.');
+    } finally {
+      setDownloadingPublisher(false);
+    }
+  }, [book, pages, covers]);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
     else document.exitFullscreen().catch(() => {});
@@ -318,6 +334,22 @@ export default function Studio({ bookId, onBack }: StudioProps) {
                   className="px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
                 >
                   <Plus size={14} /> Add Spread
+                </button>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl space-y-3">
+                <h3 className="text-sm font-bold text-teal-300 flex items-center gap-2 mb-1">
+                  <BookMarked size={16} /> Publisher-Ready Book
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                  Compiles your book into a linear HTML file for publishers — text, images, and cover included.
+                </p>
+                <button
+                  onClick={handleDownloadForPublishers}
+                  disabled={downloadingPublisher}
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-95 transition-all disabled:opacity-60"
+                >
+                  {downloadingPublisher ? <Loader2 className="animate-spin" size={16} /> : <FileDown size={16} />}
+                  {downloadingPublisher ? 'Compiling…' : 'Download for Publishers (.html)'}
                 </button>
               </div>
 
