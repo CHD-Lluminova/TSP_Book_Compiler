@@ -5,13 +5,18 @@ export interface Covers {
   back: string | null;
   spine: string | null;
   fullWrap: string | null;
+  originalFront: string | null;
+  originalBack: string | null;
+  originalSpine: string | null;
+  originalFullWrap: string | null;
 }
 
 export interface BookPage {
   num: number;
   text: string;
   fullPage: boolean;
-  imageDataUrl: string | null;
+  imageDataUrl: string | null; // This will be the compressed one for UI
+  originalImageDataUrl: string | null; // This will be the high-res one for PDF
 }
 
 export interface BookRow {
@@ -48,11 +53,13 @@ export const DEFAULT_PAGES: BookPage[] = [
     text: "Once upon a time, in a little house at the edge of a whispering forest, a curious child discovered a tiny, glowing door hidden behind the old oak tree.",
     fullPage: false,
     imageDataUrl: null,
+    originalImageDataUrl: null,
   },
   {
     num: 2,
     text: "The door was no taller than a teacup, but it hummed with a warm golden light that seemed to invite the child to step closer and listen.",
     fullPage: false,
     imageDataUrl: null,
+    originalImageDataUrl: null,
   },
 ];

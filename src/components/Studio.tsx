@@ -22,10 +22,11 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { fetchFullBook, saveBookMeta, saveCovers, bulkSaveBook } from '@/lib/db';
 import { Book3DEngine } from '@/lib/bookEngine';
-import { buildStandalone3DHTML, downloadHTML, buildPublisherHTML } from '@/lib/htmlExport';
+import { buildStandalone3DHTML, downloadHTML } from '@/lib/htmlExport';
 import { reflowPages } from '@/lib/textWrap';
 import { fileToCompressedDataUrl } from '@/lib/imageUtils';
 import type { BookPage, Covers, FullBook } from '@/types';
+import { jsPDF } from 'jspdf';
 import { DEFAULT_PAGES } from '@/types';
 
 type Tab = 'pages' | 'cover' | 'export';
@@ -49,6 +50,10 @@ export default function Studio({ bookId, onBack }: StudioProps) {
     back: null,
     spine: null,
     fullWrap: null,
+    originalFront: null,
+    originalBack: null,
+    originalSpine: null,
+    originalFullWrap: null,
   });
   const [activeSpread, setActiveSpread] = useState(0);
   const [tab, setTab] = useState<Tab>('pages');
@@ -70,7 +75,7 @@ export default function Studio({ bookId, onBack }: StudioProps) {
         if (cancelled) return;
         setBook(full);
         setPages(full.pages.length ? full.pages : DEFAULT_PAGES.map((p) => ({ ...p })));
-        setCovers(full.covers || { front: null, back: null, spine: null, fullWrap: null });
+        setCovers(full.covers ? { ...full.covers, originalFront: full.covers.front, originalBack: full.covers.back, originalSpine: full.covers.spine, originalFullWrap: full.covers.fullWrap } : { front: null, back: null, spine: null, fullWrap: null, originalFront: null, originalBack: null, originalSpine: null, originalFullWrap: null });
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Could not open this book.');
       } finally {
@@ -122,10 +127,15 @@ export default function Studio({ bookId, onBack }: StudioProps) {
   }, []);
 
   const handlePageImage = useCallback(async (pageIdx: number, file: File) => {
-    const dataUrl = await fileToCompressedDataUrl(file, 1100, 0.85);
+    const originalDataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+    const dataUrl = await fileToCompressedDataUrl(file, 1500, 0.95);
     setPages((prev) => {
       const next = prev.map((p) => ({ ...p }));
-      next[pageIdx] = { ...next[pageIdx], imageDataUrl: dataUrl };
+      next[pageIdx] = { ...next[pageIdx], imageDataUrl: dataUrl, originalImageDataUrl: originalDataUrl };
       return reflowPages(next, pageIdx);
     });
   }, []);
@@ -134,8 +144,8 @@ export default function Studio({ bookId, onBack }: StudioProps) {
     setPages((prev) => {
       const next = prev.map((p) => ({ ...p }));
       const n = next.length + 1;
-      next.push({ num: n, text: '', fullPage: false, imageDataUrl: null });
-      next.push({ num: n + 1, text: '', fullPage: false, imageDataUrl: null });
+      next.push({ num: n, text: '', fullPage: false, imageDataUrl: null, originalImageDataUrl: null });
+      next.push({ num: n + 1, text: '', fullPage: false, imageDataUrl: null, originalImageDataUrl: null });
       return next;
     });
   }, []);
@@ -152,8 +162,17 @@ export default function Studio({ bookId, onBack }: StudioProps) {
   }, [pages.length]);
 
   const handleCoverUpload = useCallback(async (type: keyof Covers, file: File) => {
-    const dataUrl = await fileToCompressedDataUrl(file, 2200, 0.85);
-    setCovers((prev) => ({ ...prev, [type]: dataUrl }));
+    const originalDataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+    const dataUrl = await fileToCompressedDataUrl(file, 2200, 0.95);
+    setCovers((prev) => ({
+      ...prev,
+      [type]: dataUrl,
+      [`original${type.charAt(0).toUpperCase() + type.slice(1)}`]: originalDataUrl,
+    }));
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -195,10 +214,57 @@ export default function Studio({ bookId, onBack }: StudioProps) {
     if (!book) return;
     setDownloadingPublisher(true);
     try {
-      // This will generate a different HTML structure suitable for printing/publishers
-      const printableHtml = buildPublisherHTML(pages, covers, book.title, book.author_name);
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: [576, 720], // 8 x 10 inches in PDF points (1 inch = 72 points)
+      });
+
+      // Add front cover as the first page
+      if (covers.originalFront) {
+        try {
+          doc.addImage(covers.originalFront, 'JPEG', 0, 0, 576, 720); // Fill 8x10 page
+        } catch (err) {
+          console.error('Error adding front cover to PDF:', err);
+        }
+        doc.addPage(); // Add a new page for the first interior page
+      }
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+
+        if (i > 0) {
+          doc.addPage();
+        }
+
+        // Add image if available
+        if (page.originalImageDataUrl) {
+          try {
+            doc.addImage(page.originalImageDataUrl, 'JPEG', 0, 0, 576, 720); // Fill 8x10 page
+          } catch (err) {
+            console.error(`Error adding image for page ${i + 1} to PDF:`, err);
+          }
+        }
+
+        // Add text if available
+        if (page.text) {
+          doc.setFontSize(12);
+          doc.text(page.text, 50, 50, { maxWidth: 476 }); // Basic text placement
+        }
+      }
+
+      // Add back cover as the last page
+      if (covers.originalBack) {
+        doc.addPage();
+        try {
+          doc.addImage(covers.originalBack, 'JPEG', 0, 0, 576, 720); // Fill 8x10 page
+        } catch (err) {
+          console.error('Error adding back cover to PDF:', err);
+        }
+      }
+
       const safeName = book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'book';
-      downloadHTML(printableHtml, `${safeName}_publisher_book.html`);
+      doc.save(`${safeName}_publisher_book.pdf`);
     } catch (err: any) {
       setError(err.message || 'Publisher export failed.');
     } finally {

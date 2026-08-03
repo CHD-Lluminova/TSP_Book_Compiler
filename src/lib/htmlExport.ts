@@ -195,7 +195,7 @@ export function buildStandalone3DHTML(
         let closedMaterials = [];
         let clock = new THREE.Clock();
 
-        let loadedImages = { pages: {}, fullWrap: null, front: null, back: null, spine: null };
+        let loadedImages: { pages: Record<number, HTMLImageElement>, fullWrap: HTMLImageElement | null, front: HTMLImageElement | null, back: HTMLImageElement | null, spine: HTMLImageElement | null, originalFront: HTMLImageElement | null, originalBack: HTMLImageElement | null, originalSpine: HTMLImageElement | null, originalFullWrap: HTMLImageElement | null } = { pages: {}, fullWrap: null, front: null, back: null, spine: null, originalFront: null, originalBack: null, originalSpine: null, originalFullWrap: null };
 
         const frontCanvas = document.createElement('canvas');
         const backCanvas = document.createElement('canvas');
@@ -229,28 +229,33 @@ ${wrapFnSource}
 
         function initThree() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x0a0c10, 0.04);
+            // scene.fog = new THREE.FogExp2(0x0a0c10, 0.04);
             camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
             camera.position.set(0, 1.2, 10);
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+            renderer.setClearColor(0x000000, 1); // Explicitly set clear color to black and opaque
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMapping = THREE.NoToneMapping;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.physicallyCorrectLights = false;
             container.appendChild(renderer.domElement);
+            renderer.domElement.style.filter = 'none';
+            renderer.domElement.style.mixBlendMode = 'normal';
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true; controls.dampingFactor = 0.05;
             controls.maxDistance = 15; controls.minDistance = 3; controls.target.set(0,0,0);
             controls.addEventListener('start', () => { if (autoSpin) toggleAutoSpin(); });
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-            dirLight.position.set(5, 10, 6); dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-            scene.add(dirLight);
-            const pl = new THREE.PointLight(0x0d9488, 2.5, 15); pl.position.set(-3,2,4); scene.add(pl);
+            // scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+            // const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            // dirLight.position.set(5, 10, 6); dirLight.castShadow = true;
+            // dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
+            // scene.add(dirLight);
+            // const pl = new THREE.PointLight(0x0d9488, 2.5, 15); pl.position.set(-3,2,4); scene.add(pl);
 
             const sp = new THREE.Mesh(new THREE.PlaneGeometry(30,30), new THREE.ShadowMaterial({ opacity: 0.35 }));
             sp.rotation.x = -Math.PI/2; sp.position.y = -3.0; sp.receiveShadow = true; scene.add(sp);
@@ -263,9 +268,9 @@ ${wrapFnSource}
             const rm = Array(6).fill(0).map((_,i)=> new THREE.MeshStandardMaterial({ color: i===4||i===5?0xffffff:0x134e4a, roughness:0.3 }));
             leftCoverMesh = new THREE.Mesh(cg, lm); leftCoverMesh.position.set(-1.875,0,-0.06); leftCoverMesh.castShadow=true; openedBookGroup.add(leftCoverMesh);
             rightCoverMesh = new THREE.Mesh(cg, rm); rightCoverMesh.position.set(1.875,0,-0.06); rightCoverMesh.castShadow=true; openedBookGroup.add(rightCoverMesh);
-            leftPageMesh = new THREE.Mesh(createPageCurveGeometry(3.6,5.1,15,15,true), new THREE.MeshStandardMaterial({ roughness:0.9, metalness:0, side:THREE.DoubleSide }));
+            leftPageMesh = new THREE.Mesh(createPageCurveGeometry(3.6,5.1,15,15,true), new THREE.MeshBasicMaterial({ side:THREE.DoubleSide }));
             leftPageMesh.position.set(-1.82,0,0); leftPageMesh.castShadow=true; openedBookGroup.add(leftPageMesh);
-            rightPageMesh = new THREE.Mesh(createPageCurveGeometry(3.6,5.1,15,15,false), new THREE.MeshStandardMaterial({ roughness:0.9, metalness:0, side:THREE.DoubleSide }));
+            rightPageMesh = new THREE.Mesh(createPageCurveGeometry(3.6,5.1,15,15,false), new THREE.MeshBasicMaterial({ side:THREE.DoubleSide }));
             rightPageMesh.position.set(1.82,0,0); rightPageMesh.castShadow=true; openedBookGroup.add(rightPageMesh);
             window.addEventListener('resize', onWindowResize);
         }
@@ -304,15 +309,10 @@ ${wrapFnSource}
         function drawPageOnCanvas(canvas, pageData, isLeft) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0,0,canvas.width,canvas.height);
-            ctx.fillStyle="#faf4ec"; ctx.fillRect(0,0,canvas.width,canvas.height);
-            let sh = ctx.createLinearGradient(0,0,canvas.width,0);
-            if (isLeft) { sh.addColorStop(0.7,'rgba(0,0,0,0)'); sh.addColorStop(1,'rgba(0,0,0,0.15)'); }
-            else { sh.addColorStop(0,'rgba(0,0,0,0.15)'); sh.addColorStop(0.3,'rgba(0,0,0,0)'); }
-            ctx.fillStyle=sh; ctx.fillRect(0,0,canvas.width,canvas.height);
             const img = loadedImages.pages[pageData.num];
             if (img) {
                 if (pageData.fullPage) ctx.drawImage(img,0,0,canvas.width,canvas.height);
-                else { ctx.save(); ctx.fillStyle="#fff"; ctx.shadowColor="rgba(0,0,0,0.06)"; ctx.shadowBlur=15; ctx.shadowOffsetY=8; const cw=840,ch=780,cx=(canvas.width-cw)/2,cy=100; ctx.fillRect(cx,cy,cw,ch); ctx.restore(); const m=40; ctx.drawImage(img,cx+m,cy+m,cw-m*2,ch-m*2-40); }
+                else { ctx.drawImage(img,(canvas.width-840)/2+40,100+40,840-40*2,780-40*2-40); }
             } else if (!pageData.fullPage) { ctx.save(); ctx.strokeStyle="rgba(0,0,0,0.08)"; ctx.lineWidth=4; ctx.strokeRect(100,100,canvas.width-200,750); ctx.font="50px 'Fredoka'"; ctx.fillStyle="rgba(13,148,136,0.25)"; ctx.textAlign="center"; ctx.fillText("Illustration Slot",canvas.width/2,450); ctx.restore(); }
             if (!pageData.fullPage) {
                 ctx.fillStyle="#1e293b"; ctx.font="bold 44px 'Fredoka'"; ctx.textAlign="center";
@@ -325,16 +325,16 @@ ${wrapFnSource}
 
         function updateAllTextures() {
             drawCovers();
-            const fT=new THREE.CanvasTexture(frontCanvas), bT=new THREE.CanvasTexture(backCanvas), sT=new THREE.CanvasTexture(spineCanvas);
-            const eC=document.createElement('canvas'); eC.width=128;eC.height=128; const ec=eC.getContext('2d'); ec.fillStyle="#faf4ec";ec.fillRect(0,0,128,128); ec.strokeStyle="rgba(100,80,50,0.12)";ec.lineWidth=1; for(let i=0;i<128;i+=3){ec.beginPath();ec.moveTo(0,i);ec.lineTo(128,i);ec.stroke();} const eT=new THREE.CanvasTexture(eC);
+            const fT=new THREE.CanvasTexture(frontCanvas, THREE.sRGBEncoding); fT.encoding = THREE.sRGBEncoding; const bT=new THREE.CanvasTexture(backCanvas, THREE.sRGBEncoding); bT.encoding = THREE.sRGBEncoding; const sT=new THREE.CanvasTexture(spineCanvas, THREE.sRGBEncoding); sT.encoding = THREE.sRGBEncoding;
+            const eC=document.createElement('canvas'); eC.width=128;eC.height=128; const ec=eC.getContext('2d'); ec.fillStyle="#faf4ec";ec.fillRect(0,0,128,128); ec.strokeStyle="rgba(100,80,50,0.12)";ec.lineWidth=1; for(let i=0;i<128;i+=3){ec.beginPath();ec.moveTo(0,i);ec.lineTo(128,i);ec.stroke();} const eT=new THREE.CanvasTexture(eC, THREE.sRGBEncoding); eT.encoding = THREE.sRGBEncoding;
             closedMaterials[4].map=fT; closedMaterials[5].map=bT; closedMaterials[1].map=sT; closedMaterials[0].map=eT; closedMaterials[2].map=eT; closedMaterials[3].map=eT;
             closedMaterials.forEach(m=>m.needsUpdate=true);
             if(leftCoverMesh){leftCoverMesh.material[5].map=bT;leftCoverMesh.material[5].needsUpdate=true;}
             if(rightCoverMesh){rightCoverMesh.material[5].map=fT;rightCoverMesh.material[5].needsUpdate=true;}
             drawPageOnCanvas(leftPageCanvas, pages[activeSpreadIndex*2], true);
             drawPageOnCanvas(rightPageCanvas, pages[activeSpreadIndex*2+1], false);
-            leftPageMesh.material.map=new THREE.CanvasTexture(leftPageCanvas); leftPageMesh.material.needsUpdate=true;
-            rightPageMesh.material.map=new THREE.CanvasTexture(rightPageCanvas); rightPageMesh.material.needsUpdate=true;
+            leftPageMesh.material.map=new THREE.CanvasTexture(leftPageCanvas, THREE.sRGBEncoding); leftPageMesh.material.map.encoding = THREE.sRGBEncoding; leftPageMesh.material.needsUpdate=true;
+            rightPageMesh.material.map=new THREE.CanvasTexture(rightPageCanvas, THREE.sRGBEncoding); rightPageMesh.material.map.encoding = THREE.sRGBEncoding; rightPageMesh.material.needsUpdate=true;
             updateHUDText();
         }
 

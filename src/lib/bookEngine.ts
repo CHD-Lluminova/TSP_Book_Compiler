@@ -175,8 +175,10 @@ export class Book3DEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE_ANY.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE_ANY.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMapping = THREE_ANY.NoToneMapping; // Changed to NoToneMapping
+    this.renderer.toneMappingExposure = 1.0; // Reset exposure
+    this.renderer.outputEncoding = THREE_ANY.sRGBEncoding; // Corrected for r128
+    this.renderer.setClearColor(0x000000, 0); // Set clear color to transparent black
     this.container.appendChild(this.renderer.domElement);
 
     this.controls = new THREE_ANY.OrbitControls(this.camera, this.renderer.domElement);
@@ -189,17 +191,17 @@ export class Book3DEngine {
       if (this.autoSpin) this.toggleAutoSpin();
     });
 
-    const ambientLight = new THREE_ANY.AmbientLight(0xffffff, 0.65);
+    const ambientLight = new THREE_ANY.AmbientLight(0xffffff, 0.05); // Significantly reduced intensity
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE_ANY.DirectionalLight(0xffffff, 1.2);
+    const dirLight = new THREE_ANY.DirectionalLight(0xffffff, 1.8); // Increased intensity
     dirLight.position.set(5, 10, 6);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
 
-    const pointLight = new THREE_ANY.PointLight(0x0d9488, 2.5, 15);
+    const pointLight = new THREE_ANY.PointLight(0xffffff, 3.0, 15); // Neutral white, increased intensity
     pointLight.position.set(-3, 2, 4);
     this.scene.add(pointLight);
 
@@ -226,18 +228,16 @@ export class Book3DEngine {
       .fill(null)
       .map(
         (_, idx) =>
-          new THREE_ANY.MeshStandardMaterial({
+          new THREE_ANY.MeshBasicMaterial({
             color: idx === 4 || idx === 5 ? 0xffffff : 0x134e4a,
-            roughness: 0.3,
           })
       );
     const coverRMaterials = Array(6)
       .fill(null)
       .map(
         (_, idx) =>
-          new THREE_ANY.MeshStandardMaterial({
+          new THREE_ANY.MeshBasicMaterial({
             color: idx === 4 || idx === 5 ? 0xffffff : 0x134e4a,
-            roughness: 0.3,
           })
       );
 
@@ -254,13 +254,13 @@ export class Book3DEngine {
     const leftCurvedGeo = this.createPageCurveGeometry(3.6, 5.1, 15, 15, true);
     const rightCurvedGeo = this.createPageCurveGeometry(3.6, 5.1, 15, 15, false);
 
-    const pageMatConfig = { roughness: 0.9, metalness: 0.0, side: THREE_ANY.DoubleSide };
-    this.leftPageMesh = new THREE_ANY.Mesh(leftCurvedGeo, new THREE_ANY.MeshStandardMaterial(pageMatConfig));
+    const pageMatConfig = { side: THREE_ANY.DoubleSide };
+    this.leftPageMesh = new THREE_ANY.Mesh(leftCurvedGeo, new THREE_ANY.MeshBasicMaterial(pageMatConfig));
     this.leftPageMesh.position.set(-1.82, 0, 0);
     this.leftPageMesh.castShadow = true;
     this.openedBookGroup.add(this.leftPageMesh);
 
-    this.rightPageMesh = new THREE_ANY.Mesh(rightCurvedGeo, new THREE_ANY.MeshStandardMaterial(pageMatConfig));
+    this.rightPageMesh = new THREE_ANY.Mesh(rightCurvedGeo, new THREE_ANY.MeshBasicMaterial(pageMatConfig));
     this.rightPageMesh.position.set(1.82, 0, 0);
     this.rightPageMesh.castShadow = true;
     this.openedBookGroup.add(this.rightPageMesh);
@@ -279,12 +279,12 @@ export class Book3DEngine {
     const geometry = new THREE_ANY.BoxGeometry(3.6, 5.1, currentThickness);
 
     this.closedMaterials = [
-      new THREE_ANY.MeshStandardMaterial({ name: 'pages_right' }),
-      new THREE_ANY.MeshStandardMaterial({ name: 'spine' }),
-      new THREE_ANY.MeshStandardMaterial({ name: 'pages_top' }),
-      new THREE_ANY.MeshStandardMaterial({ name: 'pages_bottom' }),
-      new THREE_ANY.MeshStandardMaterial({ name: 'front' }),
-      new THREE_ANY.MeshStandardMaterial({ name: 'back' }),
+      new THREE_ANY.MeshBasicMaterial({ name: 'pages_right' }),
+      new THREE_ANY.MeshBasicMaterial({ name: 'spine' }),
+      new THREE_ANY.MeshBasicMaterial({ name: 'pages_top' }),
+      new THREE_ANY.MeshBasicMaterial({ name: 'pages_bottom' }),
+      new THREE_ANY.MeshBasicMaterial({ name: 'front' }),
+      new THREE_ANY.MeshBasicMaterial({ name: 'back' }),
     ];
 
     this.closedBookMesh = new THREE_ANY.Mesh(geometry, this.closedMaterials);
@@ -355,16 +355,17 @@ export class Book3DEngine {
     ctx.fillStyle = '#faf4ec';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const shading = ctx.createLinearGradient(0, 0, canvas.width, 0);
-    if (isLeft) {
-      shading.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
-      shading.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-    } else {
-      shading.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
-      shading.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
-    }
-    ctx.fillStyle = shading;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Removed shading for true image representation
+    // const shading = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    // if (isLeft) {
+    //   shading.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+    //   shading.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+    // } else {
+    //   shading.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+    //   shading.addColorStop(0.3, 'rgba(0, 0, 0, 0)');
+    // }
+    // ctx.fillStyle = shading;
+    // ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const img = this.loadedImages.pages[page.num];
 
@@ -449,12 +450,18 @@ export class Book3DEngine {
     this.drawCovers();
 
     const frontTex = new THREE_ANY.CanvasTexture(this.frontCanvas);
+    frontTex.encoding = THREE_ANY.sRGBEncoding;
     const backTex = new THREE_ANY.CanvasTexture(this.backCanvas);
+    backTex.encoding = THREE_ANY.sRGBEncoding;
     const spineTex = new THREE_ANY.CanvasTexture(this.spineCanvas);
+    spineTex.encoding = THREE_ANY.sRGBEncoding;
     const pagesEdgeTex = new THREE_ANY.CanvasTexture(this.generatePagesEdge());
+    pagesEdgeTex.encoding = THREE_ANY.sRGBEncoding;
 
     this.closedMaterials[4].map = frontTex;
+    this.closedMaterials[4].color.set(0xffffff);
     this.closedMaterials[5].map = backTex;
+    this.closedMaterials[5].color.set(0xffffff);
     this.closedMaterials[1].map = spineTex;
     this.closedMaterials[0].map = pagesEdgeTex;
     this.closedMaterials[2].map = pagesEdgeTex;
@@ -477,11 +484,15 @@ export class Book3DEngine {
     if (rightPage) this.drawPageOnCanvas(this.rightPageCanvas, rightPage, false);
 
     if (this.leftPageMesh) {
-      this.leftPageMesh.material.map = new THREE_ANY.CanvasTexture(this.leftPageCanvas);
+      const leftPageTexture = new THREE_ANY.CanvasTexture(this.leftPageCanvas);
+      leftPageTexture.encoding = THREE_ANY.sRGBEncoding;
+      this.leftPageMesh.material.map = leftPageTexture;
       this.leftPageMesh.material.needsUpdate = true;
     }
     if (this.rightPageMesh) {
-      this.rightPageMesh.material.map = new THREE_ANY.CanvasTexture(this.rightPageCanvas);
+      const rightPageTexture = new THREE_ANY.CanvasTexture(this.rightPageCanvas);
+      rightPageTexture.encoding = THREE_ANY.sRGBEncoding;
+      this.rightPageMesh.material.map = rightPageTexture;
       this.rightPageMesh.material.needsUpdate = true;
     }
 
