@@ -3,12 +3,11 @@ import { BookOpen, PenTool, Palette, Loader2, AlertCircle, ArrowRight } from 'lu
 import { useAuth } from '@/context/AuthContext';
 import type { StudioRole } from '@/types';
 
-const ACCOUNTS: { role: StudioRole; label: string; email: string; password: string; desc: string; icon: typeof PenTool; accent: string }[] = [
+const ACCOUNTS: { role: StudioRole; label: string; email: string; desc: string; icon: typeof PenTool; accent: string }[] = [
   {
     role: 'author',
     label: 'Author',
     email: 'author@lumina.studio',
-    password: 'Jamet',
     desc: 'Write the story, manage pages and text flow.',
     icon: PenTool,
     accent: 'teal',
@@ -17,7 +16,6 @@ const ACCOUNTS: { role: StudioRole; label: string; email: string; password: stri
     role: 'illustrator',
     label: 'Illustrator',
     email: 'illustrator@lumina.studio',
-    password: 'Sonsofbigboss',
     desc: 'Upload art, design covers, shape the visuals.',
     icon: Palette,
     accent: 'amber',
@@ -25,7 +23,7 @@ const ACCOUNTS: { role: StudioRole; label: string; email: string; password: stri
 ];
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const [selected, setSelected] = useState<StudioRole | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +42,7 @@ export default function LoginScreen() {
     setBusy(true);
     setError('');
     try {
-      await signIn(account.email, password || account.password);
+      await signIn(account.email, password);
     } catch (err: any) {
       setError('Wrong password. Please try again.');
     } finally {
@@ -184,8 +182,16 @@ export default function LoginScreen() {
                       {busy ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={20} />}
                       {busy ? 'Signing in…' : 'Enter Studio'}
                     </button>
+              <button
+                type="button"
+                onClick={signInWithGoogle}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 active:scale-[0.98] disabled:opacity-60 mt-4"
+              >
+                <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
+                Sign in with Google
+              </button>
 
-                    <p className="text-center text-xs text-slate-500 mt-6">
+              <p className="text-center text-xs text-slate-500 mt-6">
                       You'll work on the same shared shelf as your collaborator.
                     </p>
                   </>

@@ -9,6 +9,7 @@ interface AuthState {
   role: StudioRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -48,6 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signIn: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    },
+    signInWithGoogle: async () => {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
       if (error) throw error;
     },
     signOut: async () => {
